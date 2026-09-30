@@ -28,6 +28,63 @@ class EntryPayload(BaseModel):
     remark: str | None = None
 
 
+class BatchItemPayload(BaseModel):
+    """批量处理中的一条养护材料：id 定位材料，quantity 为本次领用数量。"""
+
+    id: int
+    quantity: int | None = None
+
+
+class BatchActionPayload(BaseModel):
+    """批量处理入参：一个动作作用于多条材料；batch_no 用于重复提交幂等。"""
+
+    action: str
+    items: list[BatchItemPayload]
+    batch_no: str | None = None
+
+
+class BatchItemResult(BaseModel):
+    """逐条处理结果：success 生效 / skipped 自动跳过 / failed 校验不通过。"""
+
+    id: int
+    code: str | None = None
+    name: str | None = None
+    outcome: str
+    reason: str
+    quantity: int | None = None
+    before_balance: int | None = None
+    after_balance: int | None = None
+
+
+class BatchActionResult(BaseModel):
+    """批量处理总结果：即使 failed_count 大于 0，成功与跳过的条目也已经生效、不回退。"""
+
+    ok: bool
+    message: str
+    action: str
+    batch_no: str
+    replayed: bool = False
+    success_count: int
+    skipped_count: int
+    failed_count: int
+    results: list[BatchItemResult]
+    entries: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class InventoryCard(BaseModel):
+    """库存看板上的一张指标卡。"""
+
+    label: str
+    value: int
+
+
+class InventoryBoard(BaseModel):
+    """养护材料库存看板：领用界面与运营看板都从这里取数，保证口径一致。"""
+
+    cards: list[InventoryCard]
+    items: list[dict[str, Any]]
+
+
 
 class PipeEntry(BaseModel):
     """管段明细结构。"""
