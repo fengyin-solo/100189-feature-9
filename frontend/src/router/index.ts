@@ -14,6 +14,7 @@ const Flow = () => import('@/views/flow/index.vue')
 const Leak = () => import('@/views/leak/index.vue')
 const Dredge = () => import('@/views/dredge/index.vue')
 const Material = () => import('@/views/material/index.vue')
+const MaterialInventory = () => import('@/views/material/inventory.vue')
 const Equip = () => import('@/views/equip/index.vue')
 const Traffic = () => import('@/views/traffic/index.vue')
 const Complaint = () => import('@/views/complaint/index.vue')
@@ -37,6 +38,7 @@ const router = createRouter({
     { path: '/leak', name: 'leak', component: Leak },
     { path: '/dredge', name: 'dredge', component: Dredge },
     { path: '/material', name: 'material', component: Material },
+    { path: '/material/inventory', name: 'material-inventory', component: MaterialInventory },
     { path: '/equip', name: 'equip', component: Equip },
     { path: '/traffic', name: 'traffic', component: Traffic },
     { path: '/complaint', name: 'complaint', component: Complaint },

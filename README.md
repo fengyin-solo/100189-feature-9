@@ -74,3 +74,14 @@ npm run dev
   `backend/app/routers/<模块>.py`，业务规则在 `backend/app/services/<模块>.py`。
 - 列表接口统一返回 `{ items, total, page, size }`，动作接口统一返回 `{ ok, message }`。
 - 状态流转只允许在 `app/services` 里改，路由层不做业务判断。
+
+### 养护材料批量领用
+
+- `POST /api/material/batch-consume`：勾选多条材料一次提交，请求体 `{ batch_no, items: [{ id, quantity }] }`。
+  逐条独立处理，任一条失败（已冻结、已耗尽、超量、批内重复）都不影响其余条目，不做整体回退；
+  响应里按条给出成功/失败原因与扣减前后数量。
+- 幂等：同一 `batch_no` 重复提交只扣一次库存、只回放首次处理结果（响应带 `replayed: true`）。
+  历史批次可通过 `GET /api/material/batches` 回看。
+- 结存掉到储备下限以下自动转为「临近不足」（仍可参与领用），归零自动转「已耗尽」；
+  冻结已耗尽材料时自动跳过。
+- `GET /api/material/inventory` 提供库存看板数据，结存/可用数量与领用界面逐条同源一致。

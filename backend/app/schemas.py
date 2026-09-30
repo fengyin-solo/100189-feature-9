@@ -28,6 +28,35 @@ class EntryPayload(BaseModel):
     remark: str | None = None
 
 
+class BatchConsumeItem(BaseModel):
+    """批量领用中的一条：材料 id + 本次领用数量。"""
+
+    id: int
+    领用数量: int = Field(alias="quantity", default=0)
+    材料编号: str | None = None
+
+    model_config = {"populate_by_name": True}
+
+
+class BatchConsumePayload(BaseModel):
+    """勾选多条养护材料后一次提交；batch_no 用于幂等去重。"""
+
+    batch_no: str
+    items: list[BatchConsumeItem] = Field(default_factory=list)
+    remark: str | None = None
+
+
+class BatchConsumeResult(BaseModel):
+    """批量领用逐条结果：条目级失败互不影响、不回退。"""
+
+    batch_no: str
+    replayed: bool = False
+    total: int = 0
+    succeeded: int = 0
+    failed: int = 0
+    results: list[dict[str, Any]] = Field(default_factory=list)
+
+
 
 class PipeEntry(BaseModel):
     """管段明细结构。"""

@@ -1,18 +1,24 @@
-"""养护材料接口：维护养护材料，覆盖冻结材料、解冻材料、登记耗尽等动作。"""
+"""养护材料接口：维护养护材料，覆盖冻结材料、解冻材料、登记耗尽与批量领用。"""
 from __future__ import annotations
 
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 
-from app.schemas import ActionResult, EntryPayload, PageResult
+from app.schemas import (
+    ActionResult,
+    BatchConsumePayload,
+    BatchConsumeResult,
+    EntryPayload,
+    PageResult,
+)
 from app.services.material import MaterialService
 
 router = APIRouter(prefix="/api/material", tags=["养护材料"])
 
 service = MaterialService()
 
-LIST_FIELDS = ["材料编号", "材料名称", "规格型号", "结存数量", "计量单位", "存放场地", "保管人员", "材料状态"]
+LIST_FIELDS = ["材料编号", "材料名称", "规格型号", "结存数量", "可用数量", "储备下限", "计量单位", "存放场地", "保管人员", "材料状态"]
 STATUSES = ["正常可用", "临近不足", "已冻结", "已耗尽"]
 
 
@@ -28,6 +34,25 @@ def list_entries(
         raise HTTPException(status_code=400, detail="每页最多 200 条，请缩小分页范围")
     items, total = service.list_entries(keyword=keyword, status=status, page=page, size=size)
     return PageResult(items=items, total=total, page=page, size=size)
+
+
+@router.get("/inventory", response_model=dict)
+def inventory_board() -> dict[str, Any]:
+    """库存看板：结存与可用数量逐条给出，和领用界面看到的完全一致。"""
+    return service.inventory_board()
+
+
+@router.get("/batches", response_model=list[dict])
+def list_batches() -> list[dict[str, Any]]:
+    """历次批量领用处理结果，便于回看每条成功与失败原因。"""
+    return service.list_batch_records()
+
+
+@router.get("/export")
+def export_entries() -> dict[str, Any]:
+    """导出养护材料清单：返回当前过滤条件下的全量数据。"""
+    items, total = service.list_entries(page=1, size=10000)
+    return {"module": "material", "total": total, "items": items}
 
 
 @router.get("/{entry_id}", response_model=dict)
@@ -48,6 +73,22 @@ def create_entry(payload: EntryPayload) -> ActionResult:
     return ActionResult(ok=True, message="养护材料已登记", entry=entry)
 
 
+@router.post("/batch-consume", response_model=BatchConsumeResult)
+def batch_consume(payload: BatchConsumePayload) -> BatchConsumeResult:
+    """勾选多条养护材料一次提交领用。
+
+    - 已耗尽/已冻结/超量等不通过的条目逐条说明原因，其余条目照常生效不回退；
+    - 结存掉到储备下限以下自动转为「临近不足」；
+    - 同一 batch_no 重复提交只扣一次库存、只回放首次处理结果。
+    """
+    items = [item.model_dump() for item in payload.items]
+    result, error = service.consume_batch(items, payload.batch_no)
+    if result is None:
+        # 整体入参不合法（批次号缺失、未勾选条目）才走 400
+        raise HTTPException(status_code=400, detail=error)
+    return BatchConsumeResult(**result)
+
+
 @router.post("/{entry_id}/actions", response_model=ActionResult)
 def run_action(entry_id: int, payload: EntryPayload) -> ActionResult:
     """对单条养护材料执行冻结材料、解冻材料、登记耗尽；不允许的动作会被拦下并说明原因。"""
@@ -56,10 +97,3 @@ def run_action(entry_id: int, payload: EntryPayload) -> ActionResult:
     if entry is None:
         return ActionResult(ok=False, message=message)
     return ActionResult(ok=True, message=message, entry=entry)
-
-
-@router.get("/export")
-def export_entries() -> dict[str, Any]:
-    """导出养护材料清单：返回当前过滤条件下的全量数据。"""
-    items, total = service.list_entries(page=1, size=10000)
-    return {"module": "material", "total": total, "items": items}
